@@ -1,0 +1,3 @@
+ADD eax, 2
+MOV eax, 4
+hlt
