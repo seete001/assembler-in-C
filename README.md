@@ -1,203 +1,609 @@
 # Simple Assembler (Educational Project)
 
-This project is a very small educational assembler written in C.
+A small educational assembler written in C.
 
-It converts simple assembly-like instructions into hex machine-code-like output.
+This project started as a simple experiment that converted a few assembly-like instructions into hexadecimal output. It has evolved into a structured assembler pipeline with its own lexer, token system, parser, intermediate representation, assembler backend, file input/output system, and binary machine-code generation.
 
-It is NOT a real assembler yet — it is an incremental learning project that demonstrates how assemblers are built step by step.
-
----
-
-# What this project does
-
-- Reads an assembly file line by line
-- Parses instruction, register, and immediate value using `sscanf`
-- Uses lookup tables to map mnemonics → opcodes and registers → codes
-- Encodes instructions into a simple 3-byte format
-- Outputs results to both console and file (`bin.hex`)
+The goal of this project is not to replicate a real CPU assembler, but to understand how assemblers are designed internally and how source code is transformed into executable instructions.
 
 ---
 
-# Supported syntax
+# Project Evolution
 
-Only this exact format is supported:
+## Version 1 — Simple Line-Based Assembler
 
-ADD eax, 2  
-SUB ebx, 5  
-MOV ecx, 10  
+The first version was a minimal assembler prototype.
 
-Rules:
-- One instruction per line
-- Must include register + immediate value
-- Comma is required between register and number
-- No extra syntax supported
+It:
 
----
-
-# How it works (pipeline)
-
-Assembly file  
-→ read line  
-→ parse with sscanf  
-→ lookup opcode  
-→ lookup register code  
-→ emit encoded bytes  
-
----
-
-# Instruction set
-
-ADD → 0x83  
-SUB → 0x81  
-MOV → 0xB8  
-
----
-
-# Register set
-
-eax → 0  
-ebx → 1  
-ecx → 2  
-edx → 3  
-
----
-
-# Output format
-
-Each instruction becomes:
-
-opcode + register_code + immediate_value
+* Read an assembly file line by line
+* Used `sscanf()` to extract instruction arguments
+* Used lookup tables for instructions and registers
+* Converted instructions into a fixed byte format
 
 Example:
-ADD eax, 2 → 83 00 02  
+
+```asm
+ADD eax, 2
+```
+
+became:
+
+```
+83 00 02
+```
+
+The pipeline was:
+
+```
+Assembly file
+      |
+      v
+ sscanf()
+      |
+      v
+Opcode lookup
+      |
+      v
+Register lookup
+      |
+      v
+Hex output
+```
+
+## Limitations of the first version
+
+The first implementation had many restrictions:
+
+* Very strict input format
+* Only register + immediate instructions
+* No register-to-register operations
+* No labels
+* No memory addressing
+* No structured parsing
+* No meaningful error reporting
+* No separation between different assembler stages
+
+Although limited, this version provided the foundation for understanding assembler design.
 
 ---
 
-# Example input file (program.asm)
+# Version 2 — Structured Assembler Architecture
 
-ADD eax, 2  
-SUB ebx, 5  
-MOV ecx, 10  
+The project was redesigned into separate compiler-like stages.
 
----
+The new pipeline is:
 
-# Build
+```
+Assembly Source (.asm)
 
-gcc main.c -o assembler  
+        |
+        v
 
----
+    File Reader
 
-# Run
+        |
+        v
 
-./assembler program.asm  
+      Lexer
 
----
+        |
+        v
 
-# Output example
+      Tokens
 
-Console:
-ADD eax, 2 → 83 00 02  
-SUB ebx, 5 → 81 01 05  
-MOV ecx, 10 → B8 02 0A  
+        |
+        v
 
-File (bin.hex):
-83 00 02  
-81 01 05  
-B8 02 0A  
+      Parser
 
----
+        |
+        v
 
-# How parsing works
+  Instruction Program
 
-The program uses:
+        |
+        v
 
-sscanf(source, "%s %[^,], %d", instruction, reg, &value)
+    Assembler
 
-This extracts:
-- instruction → "ADD"
-- register → "eax"
-- value → 2
+        |
+        v
 
----
+   Machine Code
 
-# Encoding logic
+        |
+        v
 
-Final format is fixed:
+    Binary File
+```
 
-opcode (1 byte)  
-register code (1 byte)  
-immediate value (1 byte)
+Each stage has a specific responsibility.
 
 ---
 
-# ⚠️ Limitations (IMPORTANT)
+# Current Features
 
-This is a highly simplified educational assembler. It has many limitations:
+## File Input / Output
 
-## 1. Extremely strict input format
-- Must match exact syntax: `INSTR reg, number`
-- No flexibility in spacing or formatting
-- Missing comma or extra spaces can break parsing
+The assembler can now read real assembly files.
 
-## 2. Only immediate + register form
-- No memory addressing (`[eax]`, `[ebx+4]`, etc.)
-- No register-to-register operations
-- No instruction variants (like real CPU encodings)
+Example:
 
-## 3. Very limited instruction set
-- Only ADD, SUB, MOV
-- No arithmetic variants (IMUL, DIV, INC, DEC, etc.)
-- No control flow instructions (JMP, CALL, RET)
+```
+program.asm
+```
 
-## 4. No labels or symbols
-- Cannot use labels like:
-  start:
-  loop:
-- No jumps or branching support
-- No symbol resolution
+is loaded into memory, processed through the assembler pipeline, and converted into:
 
-## 5. No real machine code format
-- Output is plain hex text, not binary executable format
-- No ELF, PE, or raw binary generation
+```
+program.bin
+```
 
-## 6. Weak parsing system
-- Uses `sscanf`, which is fragile
-- Cannot handle:
-  - multiple spaces
-  - tabs reliably
-  - comments
-  - malformed input gracefully
-
-## 7. No error handling system
-- Unknown instructions silently return 0
-- Invalid registers map to 0xFF
-- No meaningful assembler error messages
-
-## 8. Fixed-size assumptions
-- Only supports small integer immediates
-- No 16/32/64-bit instruction handling
-- No overflow checks
+The output is stored as raw binary bytes.
 
 ---
 
-# What this project teaches
+# Lexer
 
-This project demonstrates the core idea of assemblers:
+The lexer scans the source code and converts characters into tokens.
 
-Assembly code  
-→ structured parsing  
-→ opcode lookup  
-→ numeric encoding  
+Supported tokens:
 
-It is the foundation of real compiler and assembler design.
+* Identifiers
+* Numbers
+* Commas
+* Colons
+* Brackets
+* New lines
+* End of file
+
+Example:
+
+Input:
+
+```asm
+MOV r1, r2
+```
+
+Tokens:
+
+```
+IDENTIFIER  MOV
+IDENTIFIER  r1
+COMMA
+IDENTIFIER  r2
+```
 
 ---
 
-# Next steps (recommended evolution path)
+# Token System
 
-1. Replace `sscanf` with a real character-based tokenizer  
-2. Add token types (INSTR, REG, IMM)  
-3. Introduce labels and symbol table  
-4. Implement multi-pass assembly  
-5. Output real binary format instead of hex text  
-6. Expand instruction encoding system  
+Tokens contain:
+
+* Token type
+* Token value
+* Line number
+* Column number
+
+This allows better debugging and future error reporting.
+
+Example:
+
+```
+IDENTIFIER: MOV (line 1, column 0)
+```
+
+---
+
+# Parser
+
+The parser converts tokens into structured instructions.
+
+Instead of directly manipulating strings, the assembler creates an internal representation.
+
+Example:
+
+```asm
+MOV r1, r2
+```
+
+becomes:
+
+```
+Instruction
+
+Opcode:
+    MOV
+
+Operands:
+    r1
+    r2
+```
+
+---
+
+# Operand System
+
+Operands are classified by type:
+
+```c
+OP_REGISTER
+OP_IMMEDIATE
+OP_LABEL
+OP_MEMORY
+```
+
+Examples:
+
+```
+r1        -> REGISTER
+
+10        -> IMMEDIATE
+
+loop      -> LABEL
+
+[address] -> MEMORY
+```
+
+Currently implemented:
+
+* Registers
+* Immediate values
+* Labels (parsing support)
+
+---
+
+# Instruction Representation
+
+Instructions are stored using structures:
+
+```c
+Instruction
+{
+    opcode
+
+    operands[2]
+
+    operand_count
+}
+```
+
+This design allows different instruction formats to be added later.
+
+---
+
+# Program Parsing
+
+The parser can process complete programs containing multiple instructions.
+
+Example:
+
+```asm
+MOV r1, r2
+ADD r3, 5
+JMP loop
+```
+
+becomes:
+
+```
+Program
+
+Instruction 0:
+    MOV
+    r1
+    r2
+
+
+Instruction 1:
+    ADD
+    r3
+    5
+
+
+Instruction 2:
+    JMP
+    loop
+```
+
+---
+
+# Opcode System
+
+Instructions are separated into their own opcode table.
+
+Example:
+
+```
+MOV -> 0x01
+ADD -> 0x02
+SUB -> 0x03
+JMP -> 0x06
+```
+
+This allows instructions to be expanded without changing the parser.
+
+---
+
+# Machine Code Generation
+
+The assembler converts instructions into bytes.
+
+Example:
+
+Assembly:
+
+```asm
+MOV r1, r2
+```
+
+Generated machine code:
+
+```
+01 01 02
+```
+
+Format:
+
+```
+opcode
+operand 1
+operand 2
+```
+
+This is a custom educational encoding format.
+
+---
+
+# Binary Output
+
+The assembler now produces real binary output.
+
+Example:
+
+Input:
+
+```asm
+MOV r1, r2
+ADD r3, 5
+```
+
+Output:
+
+```
+program.bin
+```
+
+Inspecting the file:
+
+```
+01 01 02
+02 03 05
+```
+
+The generated file contains raw bytes instead of text.
+
+---
+
+# Build System
+
+The project uses a Makefile.
+
+Build:
+
+```bash
+make
+```
+
+Run:
+
+```bash
+make run
+```
+
+Clean:
+
+```bash
+make clean
+```
+
+Project build structure:
+
+```
+assembler/
+
+├── bin/
+│   └── assembler
+│
+├── build/
+│   └── object files
+│
+├── include/
+│
+├── src/
+│
+└── tests/
+```
+
+---
+
+# Current Project Structure
+
+```
+assembler/
+
+├── include/
+│   ├── lexer.h
+│   ├── token.h
+│   ├── parser.h
+│   ├── instruction.h
+│   ├── opcode.h
+│   ├── program.h
+│   └── assembler.h
+│
+├── src/
+│   ├── main.c
+│   ├── lexer.c
+│   ├── token.c
+│   ├── parser.c
+│   ├── program.c
+│   ├── instruction.c
+│   ├── opcode.c
+│   ├── assembler.c
+│   └── IO/
+│       ├── read_file.c
+│       └── write_file.c
+│
+├── tests/
+│   ├── test_token.c
+│   ├── test_lexer.c
+│   ├── test_parser.c
+│   ├── test_opcode.c
+│   └── test_assembler.c
+│
+├── Makefile
+└── README.md
+```
+
+---
+
+# Supported Syntax
+
+Current examples:
+
+```asm
+MOV r1, r2
+
+ADD r3, 5
+
+JMP loop
+```
+
+Supported operands:
+
+```
+r1-r8       Registers
+
+number      Immediate values
+
+label       Labels
+```
+
+---
+
+# Example Conversion
+
+Input:
+
+```asm
+MOV r1, r2
+ADD r3, 5
+```
+
+Internal representation:
+
+```
+Instruction 1:
+
+MOV
+REGISTER r1
+REGISTER r2
+
+
+Instruction 2:
+
+ADD
+REGISTER r3
+IMMEDIATE 5
+```
+
+Output:
+
+```
+01 01 02
+02 03 05
+```
+
+---
+
+# Current Limitations
+
+This assembler is still educational and does not yet support:
+
+* Real CPU instruction encoding
+* ELF/PE executable formats
+* Label resolution
+* Symbol tables
+* Multiple assembly passes
+* Memory addressing
+* Comments
+* Macros
+* Variables
+* Debug information
+
+---
+
+# Future Roadmap
+
+Next improvements:
+
+1. Add symbol tables for labels
+2. Implement two-pass assembly
+3. Resolve jump addresses
+4. Add memory operands
+5. Expand instruction set
+6. Implement a virtual machine to execute generated machine code
+7. Add a debugger for the virtual machine
+
+---
+
+# What This Project Teaches
+
+This project demonstrates the core ideas behind assemblers:
+
+```
+Assembly language
+
+        |
+
+        v
+
+File reading
+
+        |
+
+        v
+
+Lexical analysis
+
+        |
+
+        v
+
+Parsing
+
+        |
+
+        v
+
+Intermediate representation
+
+        |
+
+        v
+
+Code generation
+
+        |
+
+        v
+
+Binary machine code
+```
+
+The project is built step by step to understand how real compiler and assembler tools are designed.
+
+```
+```
+
